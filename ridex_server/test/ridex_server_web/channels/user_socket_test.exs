@@ -12,7 +12,7 @@ defmodule RidexServerWeb.UserSocketTest do
   end
 
   test "authenticate and assign user ID with valid token" do
-    {:ok, user} = User.get_or_create("+1234567890", "rider")
+    {:ok, user} = User.get_or_create("+1234567890", "rider", 37.5257048, 126.8877295)
     {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
     assert {:ok, socket} = connect(UserSocket, %{"token" => token})

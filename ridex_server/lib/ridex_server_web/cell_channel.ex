@@ -16,6 +16,8 @@ defmodule RidexServerWeb.CellChannel do
       ) do
     case RidexServer.RideRequest.create(socket.assigns[:current_user], position) do
       {:ok, request} ->
+        IO.puts("Ride request created: #{inspect(socket)} #{inspect(position)}")
+
         broadcast!(socket, "ride:requested", %{
           request_id: request.id,
           position: position
@@ -77,6 +79,7 @@ defmodule RidexServerWeb.CellChannel do
 
   def handle_out("ride:requested", payload, socket) do
     if socket.assigns[:current_user].type == "driver" do
+      IO.puts("Ride requested: #{inspect(payload)}")
       push(socket, "ride:reqeusted", payload)
     end
 

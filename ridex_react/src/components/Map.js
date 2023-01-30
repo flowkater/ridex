@@ -2,14 +2,16 @@
 import React, { useState, useEffect } from 'react'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import { Socket } from 'phoenix'
-import { usePosition } from '../lib/usePosition'
 import Geohash from 'latlon-geohash'
 
-const geohashFromPosition = (position) =>
-  position ? Geohash.encode(position.lat, position.lng, 5) : ""
+// const geohashFromPosition = (position) =>
+//   position ? Geohash.encode(position.lat, position.lng, 5) : ""
 
 export default ({ user }) => {
-  const position = usePosition()
+  const [position, setPosition] = useState({
+    lat: user.lat,
+    lng: user.lng,
+  })
   const [channel, setChannel] = useState()
   const [userChannel, setUserChannel] = useState()
   const [rideRequests, setRideRequests] = useState([])
@@ -22,7 +24,9 @@ export default ({ user }) => {
       return
     }
 
-    const phxChannel = socket.channel('cell:', geohashFromPosition(position))
+    // console.log(geohashFromPosition(position));
+
+    const phxChannel = socket.channel('cell:xyz')
     phxChannel.join().receive('ok', () => {
       console.log('Joined successfully')
       setChannel(phxChannel)
@@ -36,8 +40,21 @@ export default ({ user }) => {
 
     return () => phxChannel.leave()
   }, [
-    geohashFromPosition(position),
+    // geohashFromPosition(position),
   ])
+
+  useEffect(() => {
+    if(user.type === 'driver') {
+      const intervalId = setInterval(() => {
+        setPosition({
+          lat: position.lat + 0.00006,
+          lng: position.lng + 0.00006,
+        });
+      }, 1000);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [position])
 
   if (!position) {
     return (<div>Awaiting for position...</div>)
@@ -47,19 +64,35 @@ export default ({ user }) => {
     return (<div>Connecting to channel...</div>)
   }
 
-  channel.on('ride:requested', rideRequest =>
-    setRideRequests([...rideRequests, rideRequest])
-  )
+  useEffect(() => {
+    if (!channel) return;
+
+    channel.on('ride:requested', rideRequest => {
+      console.log('A ride has been requested!', rideRequest);
+      setRideRequests([...rideRequests, rideRequest]);
+    })
+
+    return () => {
+      channel.off('ride:requested', channel);
+    }
+  }, [channel]);
+
+  
 
   userChannel.on('ride:created', ride =>
     console.log('A ride has been created!')
   )
 
-  const acceptRideRequest = (request_id) => channel.push('ride:accept_request', {
-    request_id
-  })
+  const acceptRideRequest = (request_id) => {
+    console.log('Accepting ride request', request_id)
+    channel.push('ride:accept_request', {request_id})
+  }
 
-  const requestRide = () => channel.push('ride:request', { position: position })
+  const requestRide = () => {
+    console.log('Requesting ride', position)
+    console.log(channel);
+    channel.push('ride:request', { position: position })
+  }
   
   return (
     <div>

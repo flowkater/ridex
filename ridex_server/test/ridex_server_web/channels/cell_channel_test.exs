@@ -4,8 +4,8 @@ defmodule RidexServerWeb.CellChannelTest do
   alias RidexServerWeb.{UserSocket, CellChannel}
 
   setup do
-    {:ok, rider} = User.get_or_create("+1234567890", "rider")
-    {:ok, driver} = User.get_or_create("+1234567891", "driver")
+    {:ok, rider} = User.get_or_create("+1234567890", "rider", 37.5257048, 126.8877295)
+    {:ok, driver} = User.get_or_create("+1234567891", "driver", 37.5257048, 126.8877295)
 
     {:ok, _, rider_socket} =
       UserSocket

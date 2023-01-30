@@ -7,7 +7,9 @@ defmodule RidexServerWeb.AuthenticationControllerTest do
         conn
         |> post("/api/authenticate", %{
           "phone" => "+1234567890",
-          "type" => "rider"
+          "type" => "rider",
+          "lat" => 37.5257048,
+          "lng" => 126.8877295
         })
         |> json_response(200)
 
@@ -25,7 +27,9 @@ defmodule RidexServerWeb.AuthenticationControllerTest do
         conn
         |> post("/api/authenticate", %{
           "phone" => "+1234567890",
-          "type" => "rider"
+          "type" => "rider",
+          "lat" => 37.5257048,
+          "lng" => 126.8877295
         })
         |> json_response(200)
 
