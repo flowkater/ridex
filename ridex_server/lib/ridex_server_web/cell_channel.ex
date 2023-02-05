@@ -3,8 +3,36 @@ defmodule RidexServerWeb.CellChannel do
 
   intercept(["ride:requested"])
 
-  def join("cell:" <> _geohash, _params, socket) do
-    {:ok, %{}, socket}
+  def join("cell:" <> _geohash, %{"position" => position}, socket) do
+    send(self(), {:after_join, position})
+
+    {:ok, socket}
+  end
+
+  def handle_info({:after_join, position}, socket) do
+    user = socket.assigns[:current_user]
+
+    if user.type == "driver" do
+      RidexServerWeb.Presence.track(socket, user.id, %{
+        lat: position["lat"],
+        lng: position["lng"]
+      })
+    end
+
+    push(socket, "presenece_state", RidexServerWeb.Presence.list(socket))
+
+    {:noreply, socket}
+  end
+
+  def handle_in("update_position", %{"lat" => lat, "lng" => lng}, socket) do
+    user = socket.assigns[:current_user]
+
+    RidexWeb.Presence.update(socket, user.id, %{
+      lat: lat,
+      lng: lng
+    })
+
+    {:noreply, socket}
   end
 
   def handle_in(

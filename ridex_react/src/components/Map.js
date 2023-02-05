@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
-import { Socket } from 'phoenix'
+import { Socket, Presence } from 'phoenix'
 import Geohash from 'latlon-geohash'
 
 // const geohashFromPosition = (position) =>
@@ -12,9 +12,22 @@ export default ({ user }) => {
     lat: user.lat,
     lng: user.lng,
   })
+  const [presences, setPresences] = useState({})
   const [channel, setChannel] = useState()
   const [userChannel, setUserChannel] = useState()
   const [rideRequests, setRideRequests] = useState([])
+
+  const getLat = (position) => position ? position.lat : 0
+  const getLng = (position) => position ? position.lng : 0
+
+  useEffect(() => {
+    if (channel) {
+      channel.push('update_position', position)
+    }
+  }, [
+    getLat(position),
+    getLng(position)
+  ])
 
   useEffect(() => {
     const socket = new Socket('ws://localhost:4000/socket', { params: {token: user.token}});
@@ -26,7 +39,7 @@ export default ({ user }) => {
 
     // console.log(geohashFromPosition(position));
 
-    const phxChannel = socket.channel('cell:xyz')
+    const phxChannel = socket.channel('cell:*', {position: position})
     phxChannel.join().receive('ok', () => {
       console.log('Joined successfully')
       setChannel(phxChannel)
@@ -43,18 +56,18 @@ export default ({ user }) => {
     // geohashFromPosition(position),
   ])
 
-  useEffect(() => {
-    if(user.type === 'driver') {
-      const intervalId = setInterval(() => {
-        setPosition({
-          lat: position.lat + 0.00006,
-          lng: position.lng + 0.00006,
-        });
-      }, 1000);
+  // useEffect(() => {
+  //   if(user.type === 'driver') {
+  //     const intervalId = setInterval(() => {
+  //       setPosition({
+  //         lat: position.lat + 0.00006,
+  //         lng: position.lng + 0.00006,
+  //       });
+  //     }, 1000);
 
-      return () => clearInterval(intervalId);
-    }
-  }, [position])
+  //     return () => clearInterval(intervalId);
+  //   }
+  // }, [position])
 
   if (!position) {
     return (<div>Awaiting for position...</div>)
@@ -64,20 +77,28 @@ export default ({ user }) => {
     return (<div>Connecting to channel...</div>)
   }
 
-  useEffect(() => {
-    if (!channel) return;
+  // useEffect(() => {
+  //   if (!channel) return;
 
-    channel.on('ride:requested', rideRequest => {
-      console.log('A ride has been requested!', rideRequest);
-      setRideRequests([...rideRequests, rideRequest]);
-    })
+  //   channel.on('ride:requested', rideRequest => {
+  //     console.log('A ride has been requested!', rideRequest);
+  //     setRideRequests([...rideRequests, rideRequest]);
+  //   })
 
-    return () => {
-      channel.off('ride:requested', channel);
-    }
-  }, [channel]);
+  //   return () => {
+  //     channel.off('ride:requested', channel);
+  //   }
+  // }, [channel]);
 
   
+  channel.on('presence_state', state => {
+    const syncedPresences = Presence.syncState(presences, state)
+    setPresences(syncedPresences)
+  })
+
+  const positionsFromPresences = Presence.list(presences)
+  .filter(presence => !!presence.metas)
+  .map(presence => presence.metas[0])
 
   userChannel.on('ride:created', ride =>
     console.log('A ride has been created!')
@@ -93,6 +114,12 @@ export default ({ user }) => {
     console.log(channel);
     channel.push('ride:request', { position: position })
   }
+
+  channel.on('presence_diff', response => {
+    console.log('presence_diff', response)
+    const syncedPresences = Presence.syncDiff(presences, response)
+    setPresences(syncedPresences)
+  })
   
   return (
     <div>
@@ -119,6 +146,12 @@ export default ({ user }) => {
             </Popup>
           </Marker>
         ))}
+
+        {
+          positionsFromPresences.map(({lat, lng, phx_ref}) => (
+            <Marker key={phx_ref} position={{lat, lng}} />
+          ))
+        }
       </MapContainer>
     </div>
   )
