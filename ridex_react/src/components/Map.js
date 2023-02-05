@@ -21,15 +21,6 @@ export default ({ user }) => {
   const getLng = (position) => position ? position.lng : 0
 
   useEffect(() => {
-    if (channel) {
-      channel.push('update_position', position)
-    }
-  }, [
-    getLat(position),
-    getLng(position)
-  ])
-
-  useEffect(() => {
     const socket = new Socket('ws://localhost:4000/socket', { params: {token: user.token}});
     socket.connect()
 
@@ -51,23 +42,34 @@ export default ({ user }) => {
       setUserChannel(phxUserChannel)
     })
 
-    return () => phxChannel.leave()
+    return () => {
+      phxChannel.leave()
+      phxUserChannel.leave()
+    }
   }, [
-    // geohashFromPosition(position),
   ])
 
-  // useEffect(() => {
-  //   if(user.type === 'driver') {
-  //     const intervalId = setInterval(() => {
-  //       setPosition({
-  //         lat: position.lat + 0.00006,
-  //         lng: position.lng + 0.00006,
-  //       });
-  //     }, 1000);
+  useEffect(() => {
+    if (channel) {
+      channel.push('update_position', position)
+    }
+  }, [
+    getLat(position),
+    getLng(position)
+  ])
 
-  //     return () => clearInterval(intervalId);
-  //   }
-  // }, [position])
+  useEffect(() => {
+    if(user.type === 'driver') {
+      const intervalId = setInterval(() => {
+        setPosition({
+          lat: position.lat + 0.00003,
+          lng: position.lng + 0.00003,
+        });
+      }, 1500);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [position])
 
   if (!position) {
     return (<div>Awaiting for position...</div>)
@@ -77,32 +79,33 @@ export default ({ user }) => {
     return (<div>Connecting to channel...</div>)
   }
 
-  // useEffect(() => {
-  //   if (!channel) return;
+  channel.on('ride:requested', rideRequest => {
+    console.log('A ride has been requested!', rideRequest);
+    setRideRequests([...rideRequests, rideRequest]);
+  })
 
-  //   channel.on('ride:requested', rideRequest => {
-  //     console.log('A ride has been requested!', rideRequest);
-  //     setRideRequests([...rideRequests, rideRequest]);
-  //   })
-
-  //   return () => {
-  //     channel.off('ride:requested', channel);
-  //   }
-  // }, [channel]);
-
-  
   channel.on('presence_state', state => {
+    console.log('presence_state', state);
     const syncedPresences = Presence.syncState(presences, state)
+    console.log(syncedPresences)
     setPresences(syncedPresences)
   })
+
+  channel.on('presence_diff', response => {
+    console.log('presence_diff', response)
+    const syncedPresences = Presence.syncDiff(presences, response)
+    console.log(syncedPresences)
+    setPresences(syncedPresences)
+  })
+
+  userChannel.on('ride:created', ride =>
+    console.log('A ride has been created!', ride)
+  )
 
   const positionsFromPresences = Presence.list(presences)
   .filter(presence => !!presence.metas)
   .map(presence => presence.metas[0])
 
-  userChannel.on('ride:created', ride =>
-    console.log('A ride has been created!')
-  )
 
   const acceptRideRequest = (request_id) => {
     console.log('Accepting ride request', request_id)
@@ -111,15 +114,9 @@ export default ({ user }) => {
 
   const requestRide = () => {
     console.log('Requesting ride', position)
-    console.log(channel);
+
     channel.push('ride:request', { position: position })
   }
-
-  channel.on('presence_diff', response => {
-    console.log('presence_diff', response)
-    const syncedPresences = Presence.syncDiff(presences, response)
-    setPresences(syncedPresences)
-  })
   
   return (
     <div>

@@ -4,6 +4,7 @@ defmodule RidexServerWeb.CellChannel do
   intercept(["ride:requested"])
 
   def join("cell:" <> _geohash, %{"position" => position}, socket) do
+    user = socket.assigns[:current_user]
     send(self(), {:after_join, position})
 
     {:ok, socket}
@@ -19,7 +20,7 @@ defmodule RidexServerWeb.CellChannel do
       })
     end
 
-    push(socket, "presenece_state", RidexServerWeb.Presence.list(socket))
+    push(socket, "presence_state", RidexServerWeb.Presence.list(socket))
 
     {:noreply, socket}
   end
@@ -27,7 +28,7 @@ defmodule RidexServerWeb.CellChannel do
   def handle_in("update_position", %{"lat" => lat, "lng" => lng}, socket) do
     user = socket.assigns[:current_user]
 
-    RidexWeb.Presence.update(socket, user.id, %{
+    RidexServerWeb.Presence.update(socket, user.id, %{
       lat: lat,
       lng: lng
     })
@@ -44,8 +45,6 @@ defmodule RidexServerWeb.CellChannel do
       ) do
     case RidexServer.RideRequest.create(socket.assigns[:current_user], position) do
       {:ok, request} ->
-        IO.puts("Ride request created: #{inspect(socket)} #{inspect(position)}")
-
         broadcast!(socket, "ride:requested", %{
           request_id: request.id,
           position: position
@@ -107,8 +106,8 @@ defmodule RidexServerWeb.CellChannel do
 
   def handle_out("ride:requested", payload, socket) do
     if socket.assigns[:current_user].type == "driver" do
-      IO.puts("Ride requested: #{inspect(payload)}")
-      push(socket, "ride:reqeusted", payload)
+      IO.puts("to driver Ride requested: #{inspect(payload)}")
+      push(socket, "ride:requested", payload)
     end
 
     {:noreply, socket}
